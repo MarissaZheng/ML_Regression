@@ -11,19 +11,21 @@ regression_closed_form <- function(features, output, data){
 
 
 # gradient descent function
-# input feature names: vector, output: character or vector, the data set: data frame, initial_weights: vector, step_size: numeric, tolerance: numeric
+# input feature names: vector, output: character or vector, the data set: data frame, initial_weights: vector, step_size: numeric, tolerance: a small positive numeric eg 0.01
 regression_gradient_descent <- function(features, output, data, initial_weights, step_size, tolerance){
   feature_matrix <- as.matrix(cbind(all_one = rep(1, nrow(data)), data[, features]))
   output_vector <- as.matrix(data[, output])
+  weight <- as.matrix(initial_weights) 
+  
   converge <- FALSE
   
-  weight <- as.matrix(initial_weights) 
   while (!converge) {
-    gradient <- 2 * t(t(feature_matrix %*% weight - output_vector) %*% feature_matrix)
-    weight <- weight - step_size * gradient
+    gradient <- 2 * t(feature_matrix) %*% (feature_matrix %*% weight - output_vector)
 
     if (sqrt(sum(gradient^2)) < tolerance) {
-      converge = TRUE
+      break
+    }else {
+      weight <- weight - step_size * gradient
     }
 
   }
@@ -42,7 +44,7 @@ house_train <- as.data.frame(house_train)
 house_test <- as.data.frame(house_test)
 
 # What is the value of the weight for sqft_living -- the second element of ‘simple_weights’ (rounded to 1 decimal place)?
-md <- regression_gradient_descent(features = c("sqft_living"), output = "price", house_train, c(-47000, 1), 7e-12, 2.5e7)
+md <- regression_gradient_descent(features = c("sqft_living"), output = "price", data = house_train, initial_weights = c(-47000, 1), stepsize = 7e-12, tolerance = 2.5e7)
 
 # What is the predicted price for the 1st house in the Test data set for model 1 (round to nearest dollar)?
 as.matrix(cbind(rep(1, 1), house_test[1, c("sqft_living")])) %*% md
@@ -96,7 +98,7 @@ md2 <- lm(price ~ sqft_living + bedrooms + bathrooms + lat + long +　bed_bath_r
 md3 <- lm(price ~ sqft_living + bedrooms + bathrooms + lat + long +　bed_bath_rooms　+　bedrooms_squared + log_sqft_living　+　lat_plus_long, data = house_train)
 
 
-#
+
 md1_rss_test <- sum((predict(md1, newdata = house_test %>% select(sqft_living, bedrooms, bathrooms, lat, long)) - house_test$price)^2)
 
 md2_rss_test <- sum((predict(md2, newdata = house_test %>% select(sqft_living, bedrooms, bathrooms, lat, long, bed_bath_rooms)) - house_test$price)^2)
