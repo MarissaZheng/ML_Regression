@@ -1,0 +1,176 @@
+---
+title: "ridge_regression"
+author: "Meinizi Zheng"
+date: "2019年6月15日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r packages, include=FALSE}
+library("data.table")
+library("tidyverse")
+library("glmnet")
+```
+
+
+Fit a polynomial regression model with degree 15 on data kc_house_data.csv, use an L2 penalty of 1.5e-5. What’s the learned value for the coefficient of feature power_1? # -6.860017e+01
+
+```{r cars}
+dat <- fread("week4/kc_house_data.csv")
+
+polynomial_dtframe <- function(feature, degree){
+  
+  poly_dtframe <- tibble("power_1" = feature)
+  for (i in 2:degree) {
+    poly_dtframe <- poly_dtframe %>%  
+      mutate(!!paste0("power_", i) := feature^i)
+  }
+  return(poly_dtframe)
+}
+
+poly15_data <- polynomial_dtframe(dat$sqft_living, 15)
+y <- dat$price
+x <- as.matrix(poly15_data)
+md1 <- glmnet(x, y, family = "gaussian", alpha = 0, lambda = 1.5e-5, standardize = TRUE) # alpha = 0 for ridge 1 for lasso
+
+md1$beta
+
+```
+
+Fit a 15th degree polynomial on each of the 4 sets (divide the kc_house_data.csv into 4), plot the results and view the weights for the four models. This time, set l2_small_penalty=1e-9. The four curves should differ from one another a lot, as should the coefficients you learned.
+Q: For the models learned in each of these training sets, what are the smallest and largest values you learned for the coefficient of feature power_1? -112.871072946456 and 279.842431735363"
+```{r}
+set_1 = read.csv("week3/wk3_kc_house_set_1_data.csv",
+                 sep = ",",
+                 header = T)
+set_2 = read.csv("week3/wk3_kc_house_set_2_data.csv",
+                 sep = ",",
+                 header = T)
+set_3 = read.csv("week3/wk3_kc_house_set_3_data.csv",
+                 sep = ",",
+                 header = T)
+set_4 = read.csv("week3/wk3_kc_house_set_4_data.csv",
+                 sep = ",",
+                 header = T)
+
+p1_dat = as.matrix(polynomial_dtframe(set_1$sqft_living, 15))
+p2_dat = as.matrix(polynomial_dtframe(set_2$sqft_living, 15))
+p3_dat = as.matrix(polynomial_dtframe(set_3$sqft_living, 15))
+p4_dat = as.matrix(polynomial_dtframe(set_4$sqft_living, 15))
+
+sub_md1 <- glmnet(x = p1_dat, y = set_1$price, family = "gaussian", alpha = 0, lambda = 1e-9, standardize = TRUE)
+sub_md2 <- glmnet(x = p2_dat, y = set_2$price, family = "gaussian", alpha = 0, lambda = 1e-9, standardize = TRUE)
+sub_md3 <- glmnet(x = p3_dat, y = set_3$price, family = "gaussian", alpha = 0, lambda = 1e-9, standardize = TRUE)
+sub_md4 <- glmnet(x = p4_dat, y = set_4$price, family = "gaussian", alpha = 0, lambda = 1e-9, standardize = TRUE)
+
+all_power_1_coef <- c(sub_md1$beta[1, 1], sub_md2$beta[1, 1], sub_md3$beta[1, 1], sub_md4$beta[1, 1])
+print(paste0("The min and max of power_1 coefficient is ", min(all_power_1_coef), " and ", max(all_power_1_coef)))
+
+
+# plot the 4 model. fitted against sqrt_living
+set_1$group = 1; set_2$group = 2; set_3$group = 3; set_4$group = 4
+set_1$pred = predict(sub_md1, newx = p1_dat)
+set_2$pred = predict(sub_md2, newx = p2_dat)
+set_3$pred = predict(sub_md3, newx = p3_dat)
+set_4$pred = predict(sub_md4, newx = p4_dat)
+
+all_dat = rbind(set_1, set_2, set_3, set_4)
+
+ggplot(all_dat, aes(
+  x = sqft_living,
+  y = price,
+  color = as.factor(group)
+)) +
+  geom_point(alpha = 0.25) +
+  geom_line(aes(x = sqft_living, y = pred)) +
+  theme_bw() +
+  facet_wrap( ~ group)
+
+```
+
+Ridge regression comes to rescue. Fit a 15th-order polynomial model on set_1, set_2, set_3, and set_4, this time with a large L2 penalty = 1.23e2, and plot the 4 models. These curves should vary a lot less, now that you introduced regularization. 
+Q: For the models learned with regularization in each of these training sets, what are the smallest and largest values you learned for the coefficient of feature power_1?  -77.3677453284086 and 80.1853423134927
+
+```{r}
+
+rig_md1 <- glmnet(x = p1_dat, y = set_1$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
+rig_md2 <- glmnet(x = p2_dat, y = set_2$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
+rig_md3 <- glmnet(x = p3_dat, y = set_3$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
+rig_md4 <- glmnet(x = p4_dat, y = set_4$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
+
+
+all_power_1_coef <- c(rig_md1$beta[1, 1], rig_md2$beta[1, 1], rig_md3$beta[1, 1], rig_md4$beta[1, 1])
+print(paste0("The min and max of power_1 coefficient is ", min(all_power_1_coef), " and ", max(all_power_1_coef)))
+
+
+# plot the 4 model. fitted against sqrt_living
+set_1$group = 1; set_2$group = 2; set_3$group = 3; set_4$group = 4
+set_1$pred = predict(rig_md1, newx = p1_dat)
+set_2$pred = predict(rig_md2, newx = p2_dat)
+set_3$pred = predict(rig_md3, newx = p3_dat)
+set_4$pred = predict(rig_md4, newx = p4_dat)
+
+all_dat = rbind(set_1, set_2, set_3, set_4)
+
+ggplot(all_dat, aes(
+  x = sqft_living,
+  y = price,
+  color = as.factor(group)
+)) +
+  geom_point(alpha = 0.25) +
+  geom_line(aes(x = sqft_living, y = pred)) +
+  theme_bw() +
+  facet_wrap( ~ group)
+
+
+```
+
+
+Selecting an L2 penalty via cross-validation
+```{r}
+train_valid_shuffled <- fread("week4/wk3_kc_house_train_valid_shuffled.csv")
+test_dat <- fread("week3/wk3_kc_house_test_data.csv")
+
+x_cv <- as.matrix(polynomial_dtframe(train_valid_shuffled$sqft_living, 15))
+y <- train_valid_shuffled$price
+lambda <- 10^seq(3,9, 0.5)
+
+x_test <- as.matrix(polynomial_dtframe(test_dat$sqft_living, 15))
+y_test <- test_dat$price
+
+md_cv <- cv.glmnet(x = x_cv, y = y, lambda = lambda, nfolds = 10)
+md_final <- glmnet(x = x_cv, y = y, lambda = md_cv$lambda.min) # 10^4
+
+rss_test <- sum((predict(md_final, newx = x_test) - y_test)^2)
+
+k_fold_cross_validation <- function(k, L2_penalty, input_feature, output){
+  n = nrow(train_valid_shuffled)
+  errs = rep(0, length(lambda_ls))
+  for (k in 1:K) {
+    valid_ix = ((k - 1) * (n / K) + 1):(k * (n / K))
+    Xtrain <- X1[-valid_ix,]
+    Ytrain <- Y1[-valid_ix]
+    Xvalid <- X1[valid_ix,]
+    Yvalid <- Y1[valid_ix]
+    for (il in 1:length(lambda_ls)) {
+    lambda = lambda_ls[il]
+    beta_ridge = solve(t(Xtrain) %*% Xtrain + lambda * diag(p), t(Xtrain) %*% Ytrain)
+    errs[il] = errs[il] + sum((Yvalid - Xvalid %*% beta_ridge) ^ 2)
+    }
+}
+
+lambda_star = lambda_ls[which.min(errs)]
+}
+
+
+
+
+
+```
+
+
+
