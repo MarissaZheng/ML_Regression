@@ -17,7 +17,7 @@ library("glmnet")
 ```
 
 
-Fit a polynomial regression model with degree 15 on data kc_house_data.csv, use an L2 penalty of 1.5e-5. What’s the learned value for the coefficient of feature power_1? # -6.860017e+01
+Fit a polynomial regression model with degree 15 on data kc_house_data.csv, use an L2 penalty of 1.5e-5. What’s the learned value for the coefficient of feature power_1? # 68.60
 
 ```{r cars}
 dat <- fread("week4/kc_house_data.csv")
@@ -33,11 +33,14 @@ polynomial_dtframe <- function(feature, degree){
 }
 
 poly15_data <- polynomial_dtframe(dat$sqft_living, 15)
+
+
+head(poly15_data)
 y <- dat$price
 x <- as.matrix(poly15_data)
 md1 <- glmnet(x, y, family = "gaussian", alpha = 0, lambda = 1.5e-5, standardize = TRUE) # alpha = 0 for ridge 1 for lasso
 
-md1$beta
+md1$a0
 
 ```
 
@@ -95,12 +98,14 @@ ggplot(all_dat, aes(
 Ridge regression comes to rescue. Fit a 15th-order polynomial model on set_1, set_2, set_3, and set_4, this time with a large L2 penalty = 1.23e2, and plot the 4 models. These curves should vary a lot less, now that you introduced regularization. 
 Q: For the models learned with regularization in each of these training sets, what are the smallest and largest values you learned for the coefficient of feature power_1?  -77.3677453284086 and 80.1853423134927
 
+
 ```{r}
 
 rig_md1 <- glmnet(x = p1_dat, y = set_1$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
 rig_md2 <- glmnet(x = p2_dat, y = set_2$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
 rig_md3 <- glmnet(x = p3_dat, y = set_3$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
 rig_md4 <- glmnet(x = p4_dat, y = set_4$price, family = "gaussian", alpha = 0, lambda = 1.23e2, standardize = TRUE)
+
 
 
 all_power_1_coef <- c(rig_md1$beta[1, 1], rig_md2$beta[1, 1], rig_md3$beta[1, 1], rig_md4$beta[1, 1])
