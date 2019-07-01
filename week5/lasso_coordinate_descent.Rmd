@@ -1,0 +1,205 @@
+---
+title: "Lasso_coordinate_descent"
+author: "Meinizi Zheng"
+date: "2019年7月1日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Define a function to make feature matrix 
+
+```{r cars}
+make_ft_matrix <- function(data, feature_names, output_name){
+  feature_matrix <- cbind(intercept = rep(1, nrow(data)), as.matrix(data[, feature_names]))
+  output <- data[, output_name]
+  return(list(feature_matrix = feature_matrix, output = output))
+}
+
+predict <- function(feature_matrix, weights){
+  predicted <- feature_matrix %*% weights
+}
+
+```
+
+Define function normalize_features. return (normalized_features, norms)
+
+
+```{r}
+normalize_features <- function(feature_matrix){
+  norms <- apply(feature_matrix, 2, function(x){sqrt(sum(x^2))})
+  normalized_features <-  apply(feature_matrix, 2, function(x){x/sqrt(sum(x^2))})
+  
+  return(list(normalized_features = normalized_features, norms = norms))
+}
+```
+
+Define cyclical coordinate descent function.
+The absolute value sign makes the cost function non-differentiable, so simple gradient descent is not viable (you would need to implement a method called subgradient descent). Instead, we will use coordinate descent: at each iteration, we will fix all weights but weight i and find the value of weight i that minimizes the objective. Do not include intercept in the L1 penalty term. We never want to push the intercept to zero.
+
+Input: 
+feature_matrix: a normalized matrix with intercept col
+output: a vector, y
+weights: a vector
+lambda: numeric L1 penalty
+tolerance: numeric
+
+Output:
+weights vector
+
+```{r pressure, echo=FALSE}
+
+coordinate_desc <- function(feature_matrix, output, weights, lambda, tolerance){
+  abs_max_step_change <- tolerance + 1
+  
+  while (TRUE) {
+    
+    
+    if (abs_max_step_change < tolerance) {
+      return(weights)
+      break
+    }
+    
+    previous_weights <- weights
+    
+    for (j in 1:ncol(feature_matrix)) {
+      # ro_j = t(feature_matrix[, j]) %*% (output - feature_matrix %*% weights + feature_matrix[, j] * weights[j])
+      
+      ro_j = as.numeric(t(feature_matrix[,j]) %*% (output - (feature_matrix[, -j]) %*% (weights[-j]) ))
+      weights[j] <- if (j == 1) {
+        ro_j
+      } else if (ro_j < -lambda / 2) {
+      ro_j + lambda / 2
+      } else if (ro_j > lambda / 2) {
+      ro_j - lambda / 2
+      } else{
+      0
+      } 
+    }
+    
+    abs_max_step_change <- max(abs(weights - previous_weights))
+    
+  }
+}
+
+
+```
+
+
+Use house price data set. Use two features, "sqft_living", "bedrooms". Normalize the feature matrix.
+```{r}
+dt_sale <- read.csv("week5/kc_house_data.csv")
+
+X <- make_ft_matrix(dt_sale, c("sqft_living", "bedrooms"), c("price"))$feature_matrix
+
+Y <- make_ft_matrix(dt_sale, c("sqft_living", "bedrooms"), c("price"))$output
+
+X <- normalize_features(X)$normalized_features
+norms <- normalize_features(X)$norms
+head(X)
+```
+
+
+Q1. Now suppose we were to take one step of coordinate descent on either feature 1 or feature 2. What range of values of l1_penalty would not set w[2] sqft_living zero, but would set w[3] bedrooms to zero, if we were to take a step in that coordinate?   
+```{r}
+init_weights <- c(1, 4, 1)
+
+ro_2 = t(X[, 2]) %*% (Y - X[, -2] %*% init_weights[-2])
+
+ro_3 = t(X[, 3]) %*% (Y - X[, -3] %*% init_weights[-3])
+
+
+
+```
+
+Q2: What range of values of l1_penalty would set both w[1] and w[2] to zero, if we were to take a step in that coordinate? 
+
+
+Using the following parameters, learn the weights on the sales dataset.
+
+Initial weights = all zeros
+L1 penalty = 1e7
+Tolerance = 1.0
+```{r}
+weights_sale <- coordinate_desc(feature_matrix = X, output =  Y, weights = c(0, 0, 0), lambda =  1e7, tolerance = 1.0)
+```
+
+Q: What is the RSS of the learned model on the normalized dataset?  
+Q: Which features had weight zero at convergence? 
+```{r}
+rss_sale <- sum((Y - predict(X, weights_sale))^2)
+```
+
+
+Evaluating LASSO fit with more features
+
+Let us split the sales dataset into training and test sets.  Create a normalized feature matrix from the TRAINING data with the following set of features.
+```{r}
+dt_train <- read.csv("week5/assignment2/kc_house_train_data.csv")
+
+dt_test <- read.csv("week5/assignment2/kc_house_test_data.csv")
+
+features <- c("bedrooms", "bathrooms", "sqft_living", "sqft_lot", 'floors', "waterfront", "view", "condition", "grade", "sqft_above", "sqft_basement", "yr_built", "yr_renovated")
+train <- make_ft_matrix(dt_train, features, c("price"))
+test <- make_ft_matrix(dt_test, features, c("price"))
+
+X_train <- train$feature_matrix
+Y_train <- train$output
+
+X_train <- normalize_features(X_train)$normalized_features
+norms_train <- normalize_features(X_train)$norms
+
+
+X_test <- test$feature_matrix # do not normalize
+Y_test <- test$output
+```
+
+First, learn the weights with l1_penalty=1e7, on the training data. Initialize weights to all zeros, and set the tolerance=1. Call resulting weights’ weights1e7’, you will need them later.
+Q: What features had non-zero weight in this case?   
+```{r}
+l1_penalty <- 1e7
+weights1e7 <- coordinate_desc(X_train, Y_train, weights = rep(0, ncol(X_train)), lambda = l1_penalty ,tolerance = 1)
+features_all <- c("intercept", features)
+features_all[which(weights1e7 != 0)]
+
+```
+
+Next, learn the weights with l1_penalty=1e8, on the training data. Initialize weights to all zeros, and set the tolerance=1. Call resulting weights ‘weights1e8’, you will need them later.
+Q: What features had non-zero weight in this case? 
+```{r}
+l1_penalty <- 1e8
+weights1e8 <- coordinate_desc(X_train, Y_train, weights = rep(0, ncol(X_train)), lambda = l1_penalty ,tolerance = 1)
+features_all[which(weights1e8 != 0)]
+```
+
+Finally, learn the weights with l1_penalty=1e4, on the training data. Initialize weights to all zeros, and set the tolerance=5e5. Call resulting weights ‘weights1e4’, you will need them later. (This case will take quite a bit longer to converge than the others above.)
+Q: What features had non-zero weight in this case?  
+
+```{r}
+l1_penalty <- 1e4
+weights1e4 <- coordinate_desc(X_train, Y_train, weights = rep(0, ncol(X_train)), lambda = l1_penalty ,tolerance = 5e5)
+features_all[which(weights1e4 != 0)]
+
+```
+
+Evaluating each of the learned models on the test data
+But this time, do NOT normalize the feature matrix. Instead, use the normalized version of weights to make predictions. Rescaling learned weights. Create a normalized version of each of the weights learned above. Compute the RSS of each of the three normalized weights on the (unnormalized) feature matrix.
+Q:  Which model performed best on the test data?
+
+```{r}
+normalized_weights1e7 <- weights1e7/norms_train
+normalized_weights1e8 <- weights1e8/norms_train
+normalized_weights1e4 <- weights1e4/norms_train
+
+rss_1 <- sum((X_test %*% normalized_weights1e7 - Y_test)^2)
+rss_2 <- sum((X_test %*% normalized_weights1e8 - Y_test)^2)
+rss_3 <- sum((X_test %*% normalized_weights1e4 - Y_test)^2)
+
+which.min(c(rss_1, rss_2, rss_3))
+
+```
+
+
+
