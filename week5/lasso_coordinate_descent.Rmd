@@ -65,8 +65,8 @@ coordinate_desc <- function(feature_matrix, output, weights, lambda, tolerance){
     previous_weights <- weights
     
     for (j in 1:ncol(feature_matrix)) {
-      # ro_j = t(feature_matrix[, j]) %*% (output - feature_matrix %*% weights + feature_matrix[, j] * weights[j])
       
+      # ro_j = t(feature_matrix[, j]) %*% (output - feature_matrix %*% weights + feature_matrix[, j] * weights[j])
       ro_j = as.numeric(t(feature_matrix[,j]) %*% (output - (feature_matrix[, -j]) %*% (weights[-j]) ))
       weights[j] <- if (j == 1) {
         ro_j
