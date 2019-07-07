@@ -30,7 +30,7 @@ Define function normalize_features. return (normalized_features, norms)
 ```{r}
 normalize_features <- function(feature_matrix){
   norms <- apply(feature_matrix, 2, function(x){sqrt(sum(x^2))})
-  normalized_features <-  apply(feature_matrix, 2, function(x){x/sqrt(sum(x^2))})
+  normalized_features <-  sweep(feature_matrix, 2, norms, FUN = '/')
   
   return(list(normalized_features = normalized_features, norms = norms))
 }
@@ -141,7 +141,9 @@ dt_train <- read.csv("week5/assignment2/kc_house_train_data.csv")
 
 dt_test <- read.csv("week5/assignment2/kc_house_test_data.csv")
 
+
 features <- c("bedrooms", "bathrooms", "sqft_living", "sqft_lot", 'floors', "waterfront", "view", "condition", "grade", "sqft_above", "sqft_basement", "yr_built", "yr_renovated")
+
 train <- make_ft_matrix(dt_train, features, c("price"))
 test <- make_ft_matrix(dt_test, features, c("price"))
 

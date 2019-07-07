@@ -1,0 +1,197 @@
+---
+title: "K-NN_regression_local_simple_average"
+author: "Meinizi Zheng"
+date: "2019年7月4日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Teask: 
+Find the k-nearest neighbors of a given query input
+Predict the output for the query input using the k-nearest neighbors
+Choose the best value of k using a validation set
+
+
+Read in the dataset and normalize with 2nd norms before calculaitng distances. 
+
+```{r cars}
+dt_test <- read.csv("Week6/kc_house_data_small_test.csv")
+dt_train <- read.csv("Week6/kc_house_data_small_train.csv")
+dt_validate <- read.csv("Week6/kc_house_data_validation.csv")
+
+feature_train <- as.matrix(dt_train[, c(-1, -2, -3, -17)])
+feature_test <- as.matrix(dt_test[, c(-1, -2, -3, -17)])
+feature_validate <- as.matrix(dt_validate[, c(-1, -2, -3, -17)])
+
+feature_train <- cbind(intercept = rep(1, nrow(feature_train)), feature_train)
+feature_test <- cbind(intercept = rep(1, nrow(feature_test)), feature_test)
+feature_validate <- cbind(intercept = rep(1, nrow(feature_validate)), feature_validate)
+
+tmp <- normalize_features(feature_train)
+feature_train <- tmp$normalized_features
+norms <- tmp$norms
+feature_test <- sweep(feature_test, 2, norms, FUN = "/")
+feature_validate <- sweep(feature_validate, 2, norms, FUN = "/")
+
+```
+
+To start, let's just explore computing the “distance” between two given houses. We will take our query house to be the first house of the test set and look at the distance between this house and the 10th house of the training set. 
+Q: What is the Euclidean distance between the query house and the 10th house of the training set?  0.060
+
+```{r}
+dist <- function(a, b){
+  sqrt(sum((a - b)^2))
+}
+dist(feature_test[1,], feature_train[10, ])
+
+
+```
+
+To visualize this nearest-neighbor search, let's first compute the distance from our query house (features_test[0]) to the first 10 houses of the training set (features_train[0:10]) and then search for the nearest neighbor within this small set of houses. Through restricting ourselves to a small set of houses to begin with, we can visually scan the list of 10 distances to verify that our code for finding the nearest neighbor is working.
+
+Write a loop to compute the Euclidean distance from the query house to each of the first 10 houses in the training set.
+Q: : Among the first 10 training houses, which house is the closest to the query house? 6
+
+```{r}
+
+for (i in 1:10) {
+ print(paste0("Distance of first point in test set to point ", i, " in traning set: ", dist(feature_test[1,], feature_train[i, ])))
+}
+
+```
+
+
+```{r}
+
+diff <- feature_train - feature_test[1,]
+dim(diff)
+
+diff_square <- diff^2
+sum_square <- apply(diff_square, 1, sum)
+sqrt_sum_square <- sqrt(sum_square)
+
+```
+
+
+write a function that computes the distances from a query house to all training houses. The function should take two parameters: (i) the matrix of training features and (ii) the single feature vector associated with the query.
+```{r}
+dist_vectorized <- function(matrix, vector){
+  diff <- matrix - vector
+  diff_square <- diff^2
+  sum_square <- apply(diff_square, 1, sum)
+  sqrt_sum_square <- sqrt(sum_square)
+  return(sqrt_sum_square)
+  
+}
+
+```
+
+Q: Take the query house to be third house of the test set (features_test[2]). What is the index of the house in the training set that is closest to this query house?         
+What is the predicted value of the query house based on 1-nearest neighbor regression?  
+```{r}
+min_index <- which.min(dist_vectorized(feature_train, feature_test[3,]))
+dt_train$price[min_index]
+
+```
+
+Using the functions above, write a function that takes in
+the value of k;
+the feature matrix for the instances; and
+the feature of the query
+and returns the indices of the k closest training houses. 
+```{r}
+k_nearest_neighbors <- function(k, feature_train, feature_query){
+  diff <- feature_train - feature_query
+  diff_square <- diff^2
+  sum_square <- apply(diff_square, 1, sum)
+  sqrt_sum_square <- sqrt(sum_square)
+  order(sqrt_sum_square)[1:k]
+  
+}
+```
+
+Q: Take the query house to be third house of the test set (features_test[2]). What are the indices of the 4 training houses closest to the query house?  
+```{r}
+k_nearest_neighbors(k = 4, feature_train = feature_train, feature_query = feature_test[3,])
+```
+
+
+Write a function that predicts the value of a given query house. For simplicity, take the average of the prices of the k nearest neighbors in the training set. The function should have the following parameters:
+
+the value of k;
+the feature matrix for the instances;
+the output values (prices) of the instances; and
+the feature of the query, whose price we’re predicting.
+The function should return a predicted value of the query house.
+
+```{r}
+predict_output_of_query <- function(k, feature_train, output_train, feature_query){
+  
+  index <- k_nearest_neighbors(k, feature_train, feature_query)
+  predicted <- mean(output_train[index])
+  return(predicted)
+  
+}
+```
+
+Q: Again taking the query house to be third house of the test set (features_test[2]), predict the value of the query house using k-nearest neighbors with k=4 and the simple averaging method described and implemented above. 
+```{r}
+predict_output_of_query(k = 4, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_test[3,])
+```
+
+Finally, write a function to predict the value of each and every house in a query set. (The query set can be any subset of the dataset, be it the test set or validation set.) The idea is to have a loop where we take each house in the query set as the query house and make a prediction for that specific house. The new function should take the following parameters.
+
+the value of k;
+the feature matrix for the training set;
+the output values (prices) of the training houses; and
+the feature matrix for the query set.
+The function should return a set of predicted values, one for each house in the query set.
+
+```{r}
+predict_output <- function(k, feature_train, output_train, feature_query){
+  predicted <- c()
+  for (i in 1:nrow(feature_query)) {
+    predicted[i] <- predict_output_of_query(k, feature_train, output_train, feature_query[i, ])
+  }
+  
+  return(predicted)
+}
+```
+
+Q: Make predictions for the first 10 houses in the test set, using k=10. What is the index of the house in this query set that has the lowest predicted value? What is the predicted value of this house? 
+```{r}
+value_predicted <- predict_output(k = 10, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_test[1:10, ]) 
+which.min(value_predicted)
+min(value_predicted)
+
+```
+
+There remains a question of choosing the value of k to use in making predictions. Here, we use a validation set to choose this value. Write a loop that does the following:
+For k in [1, 2, … 15]:
+Make predictions for the VALIDATION data using the k-nearest neighbors from the TRAINING data.
+Compute the RSS on VALIDATION data
+Report which k produced the lowest RSS on validation data. 
+```{r}
+predicted_price <- matrix(NA, ncol = nrow(feature_validate), nrow = 15)
+for (k in 1:15) {
+  predicted_price[k,] <- predict_output(k = k, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_validate)
+} 
+rss <- apply((predicted_price - dt_validate$price)^2, 1, sum)
+which.min(rss)
+```
+
+What is the RSS on the TEST data using the value of k found above? To be clear, sum over all houses in the TEST set. 
+```{r}
+predicted_price_on_test <- predict_output(k = 14, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_test)
+
+rss_on_test <- sum((predicted_price_on_test - dt_test$price)^2)
+
+```
+
+
+
+
+
