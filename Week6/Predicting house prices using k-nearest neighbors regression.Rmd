@@ -39,7 +39,7 @@ feature_validate <- sweep(feature_validate, 2, norms, FUN = "/")
 ```
 
 To start, let's just explore computing the “distance” between two given houses. We will take our query house to be the first house of the test set and look at the distance between this house and the 10th house of the training set. 
-Q: What is the Euclidean distance between the query house and the 10th house of the training set?  0.060
+Q: What is the Euclidean distance between the query house and the 10th house of the training set? 
 
 ```{r}
 dist <- function(a, b){
@@ -53,7 +53,7 @@ dist(feature_test[1,], feature_train[10, ])
 To visualize this nearest-neighbor search, let's first compute the distance from our query house (features_test[0]) to the first 10 houses of the training set (features_train[0:10]) and then search for the nearest neighbor within this small set of houses. Through restricting ourselves to a small set of houses to begin with, we can visually scan the list of 10 distances to verify that our code for finding the nearest neighbor is working.
 
 Write a loop to compute the Euclidean distance from the query house to each of the first 10 houses in the training set.
-Q: : Among the first 10 training houses, which house is the closest to the query house? 6
+Q: : Among the first 10 training houses, which house is the closest to the query house? 
 
 ```{r}
 
@@ -79,7 +79,7 @@ sqrt_sum_square <- sqrt(sum_square)
 write a function that computes the distances from a query house to all training houses. The function should take two parameters: (i) the matrix of training features and (ii) the single feature vector associated with the query.
 ```{r}
 dist_vectorized <- function(matrix, vector){
-  diff <- matrix - vector
+  diff <- sweep(matrix, 2, vector, FUN = '-')
   diff_square <- diff^2
   sum_square <- apply(diff_square, 1, sum)
   sqrt_sum_square <- sqrt(sum_square)
@@ -90,7 +90,7 @@ dist_vectorized <- function(matrix, vector){
 ```
 
 Q: Take the query house to be third house of the test set (features_test[2]). What is the index of the house in the training set that is closest to this query house?         
-What is the predicted value of the query house based on 1-nearest neighbor regression?  
+Q: What is the predicted value of the query house based on 1-nearest neighbor regression? Enter your answer in simple decimals without comma separators (e.g. 300000), rounded to nearest whole number.
 ```{r}
 min_index <- which.min(dist_vectorized(feature_train, feature_test[3,]))
 dt_train$price[min_index]
@@ -104,12 +104,8 @@ the feature of the query
 and returns the indices of the k closest training houses. 
 ```{r}
 k_nearest_neighbors <- function(k, feature_train, feature_query){
-  diff <- feature_train - feature_query
-  diff_square <- diff^2
-  sum_square <- apply(diff_square, 1, sum)
-  sqrt_sum_square <- sqrt(sum_square)
-  order(sqrt_sum_square)[1:k]
-  
+  dist <- dist_vectorized(feature_train, feature_query)
+  order(dist)[1:k]
 }
 ```
 
@@ -174,18 +170,21 @@ For k in [1, 2, … 15]:
 Make predictions for the VALIDATION data using the k-nearest neighbors from the TRAINING data.
 Compute the RSS on VALIDATION data
 Report which k produced the lowest RSS on validation data. 
+
 ```{r}
 predicted_price <- matrix(NA, ncol = nrow(feature_validate), nrow = 15)
 for (k in 1:15) {
   predicted_price[k,] <- predict_output(k = k, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_validate)
 } 
-rss <- apply((predicted_price - dt_validate$price)^2, 1, sum)
+diff_valid <- sweep(predicted_price, 2, dt_validate$price, FUN = '-')
+diff_valid_squared <- diff_valid^2
+rss <- apply(diff_valid_squared, 1, sum)
 which.min(rss)
 ```
 
 What is the RSS on the TEST data using the value of k found above? To be clear, sum over all houses in the TEST set. 
 ```{r}
-predicted_price_on_test <- predict_output(k = 14, feature_train = feature_train, output_train = dt_train$price, feature_query = feature_test)
+predicted_price_on_test <- predict_output(k = which.min(rss), feature_train = feature_train, output_train = dt_train$price, feature_query = feature_test)
 
 rss_on_test <- sum((predicted_price_on_test - dt_test$price)^2)
 
